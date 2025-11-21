@@ -1,0 +1,118 @@
+---
+title: "Sevilla_Mallari_Llesis"
+output: html_document
+---
+
+```{r, message=FALSE}
+# Load required libraries
+library(tidyverse) 
+library(ggplot2)
+library(dplyr)
+```
+
+```{r}
+# Load flood control project (fcp) dataset
+fcp_data <- read.csv("flood-control-projects-table_2025-11-21.csv")
+head(flood_data)
+```
+
+```{r}
+# Quick peek 
+glimpse(fcp_data)
+```
+
+### Data Dictionary – Flood Control Project Dataset
+
+This data dictionary describes each variable in the dataset, including its data type, definition, format, and any relevant notes.
+
+1.  **Identification and Administrative Fields**
+
+| Variable Name | Data Type | Description | Notes |
+|------------------|-----------------|--------------------|-----------------|
+| **GlobalID** | Character | System-generated unique identifier for each record. | Always unique. |
+| **ProjectID** | Character | Identifier assigned to the main flood control project. | Shared across components. |
+| **ProjectComponentID** | Character | Identifier for the specific component or subproject. | One project may have multiple components. |
+| **ProjectDescription** | Character | Narrative description of the flood control project. | Text field. |
+| **ProjectComponentDescription** | Character | Detailed description of the specific project component. | Text field. |
+| **Program** | Logical | Indicates program classification. | Mostly NA. |
+
+2.  **Geographic Information**
+
+| Variable Name | Data Type | Description | Notes |
+|----------------|----------------|-------------------------|----------------|
+| **Region** | Character | Administrative region of project location. | e.g., “Region IV-B”. |
+| **Province** | Character | Province where the project is located. | e.g., “Palawan”. |
+| **Municipality** | Character | Municipality/City of implementation. | Full names provided. |
+| **LegislativeDistrict** | Character | Congressional district of the project area. | Text format. |
+| **Longitude** | Double | Longitude coordinate of project site. | WGS84. |
+| **Latitude** | Double | Latitude coordinate of project site. | WGS84. |
+| **X_geo** | Character | Geospatial object stored by GIS system. | Serialized GIS object. |
+
+3.  **Project Classification**
+
+| Variable Name | Data Type | Description | Notes |
+|----------------|----------------|--------------------|---------------------|
+| **TypeofWork** | Character | Type of construction work performed. | e.g., “Construction of Flood Mitigation Structure”. |
+| **infra_type** | Character | Infrastructure classification. | e.g., “Flood Control Structures”. |
+| **type** | Character | General category label. | e.g., “flood_control”. |
+| **slug** | Character | URL-friendly identifier for project description. | Lowercase hyphenated. |
+
+4.  **Implementation Offices**
+
+| Variable Name | Data Type | Description | Notes |
+|----------------|----------------|------------------------|----------------|
+| **ImplementingOffice** | Character | DPWH office responsible for project implementation. | District/Regional. |
+| **DistrictEngineeringOffice** | Character | Specific DPWH District Engineering Office. | Matches implementing office. |
+
+5.  **Financial Information**
+
+| Variable Name | Data Type | Description | Notes |
+|----------------|----------------|------------------------|----------------|
+| **ABC** | Double | Approved Budget for the Contract (in PHP). | Numeric version. |
+| **ContractCost** | Double | Actual contract cost (in PHP). | Numeric version. |
+| **ABC_String** | Character | ABC stored as text. | Often no commas/formatting. |
+| **ContractCost_String** | Character | Contract cost stored as text. | With decimals. |
+
+6.  **Project Timeline**
+
+| Variable Name | Data Type | Description | Notes |
+|----------------|----------------|------------------------|----------------|
+| **InfraYear** | Integer | Infrastructure year of the project. | Often same as funding year. |
+| **FundingYear** | Integer | Year when project was funded. | Typically 2023–2024. |
+| **CompletionYear** | Integer | Year indicated for project completion. | Derived from planned completion date. |
+| **StartDate** | Character | Actual start date (MM/DD/YYYY). | Text format. |
+| **CompletionDateOriginal** | Double | Original planned completion date stored as UNIX timestamp. | Requires conversion. |
+| **CompletionDateActual** | Character | Actual completion date (YYYY-MM-DD). | ISO string. |
+
+7.  **Contractor and Administrative Metadata**
+
+| Variable Name | Data Type | Description | Notes |
+|---------------|---------------|---------------------------|---------------|
+| **ContractID** | Character | Contract number associated with the project. | Unique per contract. |
+| **Contractor** | Character | Name of contractor executing the project. | Text field. |
+| **ObjectId** | Integer | System object identifier for internal record tracking. | Not unique dataset-wide. |
+| **CreationDate** | Double | Timestamp of record creation. | UNIX timestamp. |
+| **Creator** | Character | System account that created the record. | Usually “dpwh_view”. |
+| **EditDate** | Double | Timestamp of most recent edit. | UNIX timestamp. |
+| **Editor** | Character | System account that edited the record. | Usually “dpwh_view”. |
+
+```{r}
+# Check for missing values
+colSums(is.na(fcp_data))
+```
+
+```{r}
+fcp_data[is.na(fcp_data$CompletionDateOriginal),]
+```
+
+***Internal Notes:***
+
+-   No recorded values in Program. Just drop the column
+-   Consider replacing null values of CompletionDateOriginal to NA
+-   Need to filter the data
+
+```{r}
+# Drop Program feature
+fcp_data$Program <- NULL
+glimpse(fcp_data)
+```
