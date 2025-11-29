@@ -1,0 +1,222 @@
+---
+title: |
+  | DS314
+  | DS Elective 1
+subtitle: |
+  | --------------------------------------------------
+  |  Flood Control
+  | --------------------------------------------------
+output:
+  pdf_document: 
+    latex_engine: lualatex
+    highlight: tango
+header-includes:
+  - "\\usepackage{graphicx}"
+  - "\\usepackage{titling}"
+  - "\\pretitle{\\begin{center}\\LARGE\\includegraphics[width=4cm]{logo.png}\\\\[\\bigskipamount]}"
+  - "\\posttitle{\\end{center}}"
+  - \usepackage{graphicx}
+  - \usepackage{titling}
+  - \usepackage{fancyvrb}
+  - \usepackage{fvextra}
+  - \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+  - \setlength{\emergencystretch}{3em}  % better text wrapping
+
+markdown: 
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(knitr)
+library(kableExtra)
+```
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
+
+```{r}
+file_path <- "flood-control-projects-table_2025-11-21.csv"
+```
+
+```{r}
+df <- read_csv(file_path)
+```
+
+```{r}
+head(df)
+```
+
+```{r}
+glimpse(df)
+```
+
+```{r}
+summary(df)
+```
+
+```{r}
+# -------------------------------------------------------------
+# Insight 1: Project Duration Analysis
+# -------------------------------------------------------------
+
+# Data Processing: Sum Cost by Contractor and take Top 10
+top_contractors <- df %>%
+  group_by(Contractor) %>%
+  summarise(Total_Value = sum(ContractCost, na.rm = TRUE)) %>%
+  arrange(desc(Total_Value)) %>%
+  slice_head(n = 10)
+
+# Plotting
+ggplot(top_contractors, aes(x = reorder(Contractor, Total_Value), y = Total_Value)) +
+  geom_col(fill = "lightgreen") +  # Matches the green color in your image
+  coord_flip() +
+  scale_y_continuous(labels = label_number(scale = 1e-9, suffix = "B")) + # Format to Billions
+  labs(title = "Top 10 Contractors by Total Contract Value",
+       x = "Contractor",
+       y = "Total Contract Value (PHP)") +
+  theme_minimal()
+```
+
+### Insight:
+
+-   **Market Dominance:** A very small number of firms control a massive portion of the budget. For instance, **Legacy Construction** and **Sunwest, Inc.** each have contracts totaling over **₱8 Billion**.
+-   **The Gap:** There is a significant drop-off after the top 3 contractors. The difference between the #1 contractor (\~₱8.3B) and the #10 contractor (\~₱1.9B) highlights an "oligopoly" where a few giants handle the largest, most capital-intensive infrastructure projects.
+
+```{r}
+# -------------------------------------------------------------
+# Insight 2: Schedule Adherence: Delays vs. Early Completion
+# -------------------------------------------------------------
+# Data Processing: Calculate Delay
+df_delay <- df %>%
+  mutate(
+    # CompletionDateOriginal is often in Unix timestamp (ms)
+    OriginalDate = as_datetime(CompletionDateOriginal / 1000),
+    ActualDate = ymd(CompletionDateActual), # Parsing YYYY-MM-DD
+    # Calculate difference: Positive = Late, Negative = Early
+    DelayDays = as.numeric(difftime(ActualDate, OriginalDate, units = "days"))
+  ) %>%
+  filter(!is.na(DelayDays)) %>%
+  # Filter to focus on the main distribution (removing extreme multi-year outliers)
+  filter(DelayDays >= -365 & DelayDays <= 365)
+
+# Plotting
+ggplot(df_delay, aes(x = DelayDays)) +
+  geom_histogram(bins = 50, fill = "purple", color = "white", alpha = 0.7) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "red", size = 1) +
+  labs(title = "Distribution of Project Completion Delays",
+       subtitle = "Negative = Early Finish | 0 = On Time | Positive = Delayed",
+       x = "Delay in Days",
+       y = "Frequency") +
+  theme_minimal()
+```
+
+### Insights:
+
+-   **High "On-Time" Reporting:** The massive peak exactly at **0** (the red line) suggests that the vast majority of projects are recorded as finished exactly on their deadline. This is highly efficient, though in government data, it can sometimes indicate that paperwork was adjusted to match the target dates.
+-   **Early Finishers:** The distribution skews to the **left** (negative values). It is more common for projects to finish *early* (or be reported as such) than to finish *late*.
+-   **The "One Year" Window:** The histogram tail essentially vanishes beyond +/- 365 days, meaning nearly all projects are wrapped up within a year of their original target, with very few dragging on indefinitely.
+
+```{r}
+# -------------------------------------------------------------
+# Insight 3: Seasonality of Project Starts
+# -------------------------------------------------------------
+# Parse Start Date and Extract Month
+df_season <- df %>%
+  mutate(
+    StartDateClean = mdy(StartDate), # Assuming format is Month/Day/Year
+    StartMonth = month(StartDateClean, label = TRUE, abbr = TRUE)
+  ) %>%
+  filter(!is.na(StartMonth))
+
+# Plotting
+ggplot(df_season, aes(x = StartMonth)) +
+  geom_bar(fill = "darkgreen", alpha = 0.8) +
+  labs(title = "Seasonality of Project Start Dates",
+       subtitle = "Do projects start during the dry season?",
+       x = "Month",
+       y = "Number of Projects Started") +
+  theme_minimal()
+```
+
+### Insights:
+
+-   **Q1/Q2 Activity:** You will likely see a spike in project starts in **February, March, and April**. This aligns with the Philippine dry season, which is the optimal window for heavy civil works like excavation and concreting before the monsoon rains (Habagat) arrive in June/July.
+-   **Fiscal Cycle vs. Weather:** If there are spikes in late Q4 (November/December), it often indicates a rush to obligate funds before the fiscal year ends, rather than an engineering decision based on weather.
+
+```{r}
+# -------------------------------------------------------------
+# Insight 4: Structure Types: The Dominance of "Mitigation Structures"
+# -------------------------------------------------------------
+# Analysis: Spending by Type of Work
+type_work <- df %>%
+  group_by(TypeofWork) %>%
+  summarise(Total_Cost = sum(ContractCost, na.rm = TRUE)) %>%
+  arrange(desc(Total_Cost)) %>%
+  slice_head(n = 10) # Top 10 types
+
+# Plotting
+ggplot(type_work, aes(x = reorder(TypeofWork, Total_Cost), y = Total_Cost)) +
+  geom_col(fill = "black") +
+  coord_flip() +
+  scale_y_continuous(labels = label_number(scale = 1e-9, suffix = "B")) +
+  labs(title = "Where does the money go? (By Structure Type)",
+       subtitle = "Generic 'Mitigation Structures' dominate the budget",
+       x = "Type of Work",
+       y = "Total Spending (Billions PHP)") +
+  theme_minimal()
+```
+
+### Insight:
+
+-   **The "Black Box" of Flood Control Funding**
+
+    The analysis reveals that the budget is dominated by a vague category labeled **"Construction of Flood Mitigation Structure,"** which accounts for **₱364 Billion** (66% of the total budget). This single classification creates a "black box" in the data. By performing text analysis on the descriptions, we found that **over 57% (3,646 projects)** explicitly mention **"River."** This confirms that the government's primary mitigation strategy is actually River Control (embankments/dredging) that simply wasn't classified into specific categories.
+
+-   **Hidden Infrastructure and Cost Implications**
+
+    The broad categorization obscures critical assets. We found **251 Seawalls** and **140 Dikes** hidden inside this generic bucket. This matters for financial tracking because of the cost hierarchy:
+
+    -   **Tier 1:** Specialized Dikes (\~₱72M avg)
+
+    -   **Tier 2:** Generic Mitigation Structures (\~₱57M avg)
+
+    -   **Tier 3:** Drainage (\~₱23M avg)
+
+    Lumping expensive dikes into the lower-average generic category understates the complexity and true cost of these specific defenses.
+
+```{r}
+# --------------------------------------------------------------------------------
+# Insight 5: Cost Variance Analysis (Percentage Savings)
+# --------------------------------------------------------------------------------
+# Analysis: Calculate Savings Rate per Region
+regional_savings <- df %>%
+  mutate(Savings_Pct = (ABC - ContractCost) / ABC) %>%
+  group_by(Region) %>%
+  summarise(
+    Avg_Savings = mean(Savings_Pct, na.rm = TRUE),
+    Median_Savings = median(Savings_Pct, na.rm = TRUE)
+  ) %>%
+  arrange(Avg_Savings)
+
+# Plotting
+ggplot(regional_savings, aes(x = reorder(Region, Avg_Savings), y = Avg_Savings)) +
+  geom_col(aes(fill = Avg_Savings), show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_gradient(low = "red", high = "green") +
+  labs(title = "Average Cost Savings by Region",
+       subtitle = "Region XI (Davao) has the lowest savings (0.4%); Region V (Bicol) has the highest (~10%)",
+       x = "Region",
+       y = "Average Savings Rate ((ABC - Cost) / ABC)") +
+  theme_minimal()
+```
+
+### Insight:
+
+-   **The Anomaly:** **Region XI (Davao Region)** has an incredibly low average savings rate of just **0.42%**. This means most contracts are awarded nearly exactly at the ceiling price, suggesting extremely "efficient" estimation or, conversely, a lack of aggressive competitive bidding.
+
+-   **The Contrast:** On the other end of the spectrum, **Region V (Bicol)** shows an average savings of **\~10%**. This indicates a much more competitive market where contractors are bidding significantly below the government's budget cap to win projects.
