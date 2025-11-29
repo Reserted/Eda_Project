@@ -1,0 +1,224 @@
+---
+title: "sevilla fcp eda"
+author: "eman"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+
+df <- read_csv("flood-control-projects-table_2025-11-21.csv")
+
+head(df)
+```
+
+```{r}
+glimpse(df)
+```
+
+```{r}
+summary(df)
+```
+
+```{r}
+ggplot(df, aes(x = ABC, y = ContractCost)) +
+  geom_point(alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+  labs(title = "ABC vs Contract Cost",
+       x = "ABC Budget",
+       y = "Contract Cost")
+```
+
+**The Strong Diagonal Line:** Most of the dots cluster tightly along a diagonal line. This means that for nearly all contracts, the final cost is almost exactly the same as the approved budget.
+
+**Contracts Below Budget:** You can see many dots falling below the main diagonal line. These dots represent contracts where the final cost was lower than the approved budget (ABC), suggesting money was saved during the bidding or negotiation process.
+
+```{r}
+ggplot(df, aes(x = ABC)) +
+  geom_histogram(bins = 30) +
+  labs(title = "Distribution of ABC Budget",
+       x = "ABC",
+       y = "Count")
+```
+
+## Most projects have low to moderate ABC values, while a smaller number of projects have very high ABC values.
+
+**This pattern is typical for infrastructure datasets because:**
+
+```         
+• Many projects are small canals, slope protections, desilting, drainage improvements
+• Only a few are major floodwalls, dikes, river improvements, or large structural works
+```
+
+## Most ABC values cluster at smaller amounts
+
+**You will notice a large concentration in the lower bin(s):**
+
+```         
+•Most projects fall under roughly ₱5M – ₱50M
+
+•These are standard local flood mitigation projects
+```
+
+This cluster indicates that small-scale projects make up the majority of DPWH’s flood control spending. \## There are outliers, very large projects
+
+**The long tail on the right side suggests:**
+
+```         
+•Some projects have ABCs in the hundreds of millions
+
+•These are large, capital-intensive flood control structures:
+
+    •Major river embankments
+    
+    •Large dike systems
+    
+    •Flood gates and river improvements
+    
+    •Multi-component flood mitigation packages
+```
+
+These high-value projects are few but significantly drive total budget spending.
+
+```{r}
+df %>%
+  count(InfraYear) %>%
+  ggplot(aes(x = InfraYear, y = n)) +
+  geom_col() +
+  labs(title = "Projects per Infra Year",
+       x = "Infra Year",
+       y = "Number of Projects")
+```
+
+## InfraYear corresponds closely to FundingYear
+
+**Since InfraYear ≈ budget year, this tells us:**
+
+```         
+Budget allocations for flood control were higher in recent fiscal years
+```
+
+```{r}
+df %>%
+  count(Region) %>%
+  ggplot(aes(x = reorder(Region, n), y = n)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Projects by Region",
+       x = "Region",
+       y = "Number of Projects")
+```
+
+## Central Luzon is one of the most flood-prone regions in the Philippines
+
+It has large river basins (Pampanga, Agno, Tarlac) that overflow frequently
+
+Many low-lying plains make flooding recurrent
+
+It contains highly populated cities like Angeles and San Fernando
+
+**So, Region III naturally receives a big share of DPWH flood mitigation projects.**
+
+## Region I, II, and V also show high project counts
+
+These regions contain:
+
+```         
+Coastal areas affected by typhoons
+
+River deltas prone to overflow
+
+Mountain-to-lowland runoff that causes flooding
+```
+
+**They often rank high in project counts because flood control is a long-term, ongoing need.**
+
+## Lower counts in Regions IX, XII, and XIII
+
+These southern regions tend to have fewer projects in your dataset because:
+
+```         
+They have lower population density
+
+Less urbanized flood infrastructure
+
+Some areas rely more on natural river pathways than engineered structures
+
+DPWH reporting varies by region
+```
+
+**This doesn’t necessarily mean they have no flooding, only that the number of funded/recorded projects is fewer in this dataset.**
+
+```{r}
+ggplot(df, aes(x = Region, y = ABC)) +
+  geom_boxplot() +
+  coord_flip() +
+  labs(title = "ABC Distribution by Region",
+       x = "Region",
+       y = "ABC")
+```
+
+**Central Tendency and Spread:** You can quickly compare the median ABC (the line in the box) and the overall spread (the length of the whiskers and the presence of outliers) for each region.
+
+**Regional Differences:** Region III, Region IV-A, and Region V appear to have higher median ABCs and also show a substantial number of very high outliers (some approaching or exceeding $3 \times 10^8$).
+
+**Outliers:** The plot clearly highlights that many regions have contracts with Approved Budgets that are significantly larger than the typical contracts in that region.
+
+```{r}
+df2 <- df
+
+# --- Ensure the columns exist ---
+print("StartDate column exists? ")
+print("StartDate" %in% names(df2))
+
+print("CompletionDateActual column exists? ")
+print("CompletionDateActual" %in% names(df2))
+
+
+# --- Parse dates safely ---
+parse_dates <- function(x) {
+  # Try multiple formats
+  y <- suppressWarnings(ymd(x))
+  y2 <- suppressWarnings(mdy(x))
+  y3 <- suppressWarnings(dmy(x))
+
+  # Use whichever successfully parsed the most values
+  best <- ifelse(!is.na(y), y,
+                 ifelse(!is.na(y2), y2, y3))
+  return(best)
+}
+
+df2$StartDate <- parse_dates(df2$StartDate)
+df2$CompletionDateActual <- parse_dates(df2$CompletionDateActual)
+
+
+# --- Compute duration ---
+df2 <- df2 %>%
+  mutate(duration_days = as.numeric(CompletionDateActual - StartDate))
+
+
+# --- Plot histogram ---
+ggplot(df2, aes(x = duration_days)) +
+  geom_histogram(bins = 50) +
+  labs(
+    x = "Duration (days)",
+    title = "Distribution of Project Durations"
+  )
+```
+
+**Skewed Distribution:** The most striking feature is that the distribution is highly right-skewed (or positively skewed). This means the majority of the data is concentrated on the left, but the "tail" stretches out to the right.
+
+**Most Projects are Short:** The distribution peaks sharply around the 0 to 250 day mark. This tells us that the vast majority of projects in this dataset have a relatively short duration—less than a year (365 days).
+
+**The Mode:** The tallest bar, or the mode, is located in the range of approximately 100 to 200 days. This is the most common project duration.
+
+**Fewer Long Projects:** The frequency drops off very quickly.Projects lasting more than 500 days (around $1.4$ years) are much less common.Projects lasting 1,000 days (around $2.7$ years) or longer are rare, but they do exist, as shown by the very low bars extending out toward 2,000 days. These long-duration projects are often responsible for pulling the average duration higher, even though most projects are completed quickly.
