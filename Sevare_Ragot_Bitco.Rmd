@@ -2,4 +2,199 @@
 title: "Sevare_Ragot_Bitco"
 output: html_document
 ---
+```{r}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(scales)
+```
+
+```{r}
+getwd()
+setwd("C:/Users/Jadee/Desktop/EDA/FINPROJ/Eda_Project")
+```
+
+```{r}
+data <- ("typhonn-impacts.xlsx")
+```
+
+```{r}
+data_one <- "typhonn-impacts.xlsx" 
+sheet_name <- "People affected"
+
+# skipping the first row to get the correct header
+data_affected <- read_excel(
+  path = data_one,
+  sheet = sheet_name,
+  skip = 2
+)
+```
+
+```{r}
+view(data_affected)
+```
+
+```{r}
+data_cleaned <- data_affected[, -c(7, 8, 9, 10, 11)]
+data_affected_cleaned <- data_cleaned[-(1:2), ]
+```
+
+```{r}
+view(data_affected_cleaned)
+```
+
+```{r}
+#Checking the total affected brgy each typhoon
+result <- data_affected_cleaned %>%
+  filter(`Province / City / Municipality` != "TOTAL") %>%   # optional: remove TOTAL row
+  group_by(`Typhoon name`) %>%
+  summarise(total_brgy = sum(Brgys., na.rm = TRUE))
+
+print(result)
+```
+
+```{r}
+ggplot(result, aes(x = total_brgy, y = `Typhoon name`)) +
+  geom_col(fill = "red") +
+  labs(title = "Total Barangays Affected per Typhoon",
+       x = "Barangays",
+       y = "Typhoon") +
+  theme_minimal()
+```
+```{r}
+province_counts <- data_affected_cleaned %>%
+  filter(`Province / City / Municipality` != "TOTAL") %>% 
+  count(`Province / City / Municipality`, name = "times_affected") %>%
+  arrange(desc(times_affected))
+
+top10_provinces <- province_counts %>% slice(1:10)
+top10_provinces
+```
+
+
+```{r}
+ggplot(top10_provinces,
+       aes(x = reorder(`Province / City / Municipality`, times_affected),
+           y = times_affected)) +
+  geom_col(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Top 10 Most Frequently Affected Provinces",
+       x = "Province",
+       y = "Number of Typhoon Records") +
+  theme_minimal()
+```
+
+```{r}
+top10_heatmap <- data_affected_cleaned %>%
+  filter(
+    `Province / City / Municipality` %in% top10_provinces$`Province / City / Municipality`,
+    !`Province / City / Municipality` %in% c("TOTAL", "GRAND TOTAL")
+  ) %>%
+  count(`Province / City / Municipality`, `Typhoon name`)
+
+ggplot(top10_heatmap,
+       aes(x = `Typhoon name`,
+           y = `Province / City / Municipality`,
+           fill = n)) +
+  geom_tile() +
+  scale_fill_continuous(name = "Times Affected") +
+  theme_minimal() +
+  labs(title = "Typhoons Affecting the Top 10 Provinces",
+       x = "Typhoon",
+       y = "Province") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+```
+
+```{r}
+#2nd sheet
+data_two <- "typhonn-impacts.xlsx" 
+sheet_name_two <- "Damaged houses"
+
+# skipping the first row to get the correct header
+data_two_affected <- read_excel(
+  path = data_two,
+  sheet = sheet_name_two,
+)
+
+```
+```{r}
+#renaming for header
+data_two_cleaned <- data_two_affected%>%
+  rename(
+    Damaged_Houses_Totally = "NUMBER OF...4",
+    Damaged_Houses_Partially = "...5",
+    Damaged_Houses_total = "...6",
+    Casualties_Dead = "NUMBER OF...7",
+    Casualties_Injured = "...8",
+    Casualties_Missing = "...9"
+  )
+```
+
+```{r}
+#removing first two rows
+datadmg_two_cleaned <- data_two_cleaned %>% slice(-1, -2)
+```
+
+```{r}
+view(datadmg_two_cleaned)
+```
+
+```{r}
+str(datadmg_two_cleaned)
+```
+```{r}
+#converting from chr to numeric
+dataf_two_cleaned <- datadmg_two_cleaned %>%
+  mutate(Casualties_Dead = as.numeric(gsub(",", "", Casualties_Dead)))
+```
+
+
+```{r}
+#deaths per typhoon
+total_deaths <- dataf_two_cleaned %>%
+  group_by(`Typhoon name`) %>%
+  summarise(Total_Deaths = sum(Casualties_Dead, na.rm = TRUE))
+
+total_deaths
+```
+
+```{r}
+#Injured
+dataf_two_cleaned <- datadmg_two_cleaned %>%
+  mutate(Casualties_Injured = as.numeric(gsub(",", "", Casualties_Injured)))
+
+total_injured <- dataf_two_cleaned %>%
+  group_by(`Typhoon name`) %>%
+  summarise(Total_injured = sum(Casualties_Injured, na.rm = TRUE))
+
+total_injured
+```
+
+```{r}
+#damaged houses per typoon
+dataf_two_cleaned <- datadmg_two_cleaned %>%
+  mutate(Damaged_Houses_total = as.numeric(gsub(",", "", Damaged_Houses_total)))
+
+damaged_houses_total <- dataf_two_cleaned %>%
+  group_by(`Typhoon name`) %>%
+  summarise(damaged_houses_total = sum(Damaged_Houses_total, na.rm = TRUE))
+
+damaged_houses_total
+```
+
+```{r}
+#visualization of damaged houses in total
+ggplot(damaged_houses_total,
+       aes(x = reorder(`Typhoon name`, damaged_houses_total),
+           y = damaged_houses_total)) +
+  geom_col(fill = "orange") +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +  # <-- formatted axis
+  labs(
+    title = "Total Damaged Houses per Typhoon",
+    x = "Typhoon Name",
+    y = "Total Damaged Houses"
+  ) +
+  theme_minimal()
+```
 
