@@ -1,0 +1,130 @@
+---
+title: "Sevare_Ragot_Bitco"
+output: html_document
+---
+```{r}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(scales)
+```
+
+```{r}
+getwd()
+setwd("C:/Users/Jadee/Desktop/EDA/FINPROJ/Eda_Project")
+```
+
+```{r}
+data <- ("typhonn-impacts.xlsx")
+```
+
+# Total Families and People Affected per Typhoon
+```{r}
+data_affected_cleaned <- data_affected_cleaned %>%
+  mutate(Families = as.numeric(gsub(",", "", Families)),
+  Person = as.numeric(gsub(",", "", Person))
+)
+```
+
+```{r}
+total_families_person <- data_affected_cleaned %>%
+group_by(Typhoon name) %>%
+summarise(
+  Total_Brgys = sum(Brgys., na.rm = TRUE),
+  Total_Families = sum(Families, na.rm = TRUE),
+  Total_Persons = sum(Person, na.rm = TRUE)
+)
+
+print = "total_families_person"
+
+```{r}
+total_families_long <- total_families_person %>%
+pivot_longer(cols = c(Total_Families, Total_Persons),
+names_to = "Type",
+values_to = "Count")
+```
+
+```{r}
+ggplot(total_families_long,
+aes(x = Typhoon name, y = Count, fill = Type)) + geom_bar(stat = "identity") +
+coord_flip() + scale_y_continuous(labels = comma) +
+labs(title = "Families vs Persons Affected per Typhoon",
+x = "Typhoon Name",
+y = "Count") +
+
+theme_minimal()
+```
+
+# Total Damaged Houses (Totally vs Partially) per Typhoon
+```{r}
+dataf_two_cleaned <- datadmg_two_cleaned %>%
+mutate(
+  Damaged_Houses_Totally = as.numeric(gsub(",", "", Damaged_Houses_Totally)),
+  Damaged_Houses_Partially = as.numeric(gsub(",", "", Damaged_Houses_Partially))
+)
+```
+```{r}
+total_damaged_types <- dataf_two_cleaned %>%
+group_by(Typhoon name) %>%
+summarise(
+Total_Totally_Damaged = sum(Damaged_Houses_Totally, na.rm = TRUE),
+Total_Partially_Damaged = sum(Damaged_Houses_Partially, na.rm = TRUE)
+)
+
+print = "total_damaged_types"
+```
+
+```{r}
+total_damaged_long <- total_damaged_types %>%
+pivot_longer(cols = c(Total_Totally_Damaged, Total_Partially_Damaged),
+names_to = "Type",
+values_to = "Count")
+```
+
+```{r}
+ggplot(total_damaged_long,
+aes(x = Typhoon name, y = Count, fill = Type)) + geom_col(position = "dodge") +
+coord_flip() + scale_y_continuous(labels = comma) +
+labs(title = "Totally vs Partially Damaged Houses per Typhoon",
+x = "Typhoon Name",
+y = "Number of Houses") +
+
+theme_minimal()
+```
+
+# Casualties Summary per Typhoon (Dead, Injured, Missing)
+```{r}
+dataf_two_cleaned <- dataf_two_cleaned %>%
+mutate( 
+  Casualties_Dead = as.numeric(gsub(",", "", Casualties_Dead)),
+  Casualties_Injured = as.numeric(gsub(",", "", Casualties_Injured)),
+  Casualties_Missing = as.numeric(gsub(",", "", Casualties_Missing))
+)
+```
+
+```{r}
+total_casualties <- dataf_two_cleaned %>%
+group_by(Typhoon name) %>%
+summarise(
+  Dead = sum(Casualties_Dead, na.rm = TRUE),
+  Injured = sum(Casualties_Injured, na.rm = TRUE),
+  Missing = sum(Casualties_Missing, na.rm = TRUE)
+)
+
+print = "total_casualties"
+```
+
+```{r}
+typhoon_example <- total_casualties_long %>% filter(Typhoon name == 
+total_casualties_long$Typhoon name[1])
+```
+
+```{r}
+ggplot(typhoon_example, aes(x = "", y = Count, fill = Type)) +
+geom_col(width = 1) + coord_polar(theta = "y") +
+labs(title = paste("Casualty Breakdown for", typhoon_example$Typhoon name[1])) +
+theme_void() + scale_fill_manual(values = c("red", "orange", "yellow"))
+
+theme_minimal()
+```
