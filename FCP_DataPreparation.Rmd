@@ -1,0 +1,237 @@
+---
+title: "DATA PREPARATION FOR FLOOD CONTROL PROJECTS DATASET"
+output: html_document
+---
+
+```{r, message=FALSE}
+# Load required libraries
+library(tidyverse) 
+library(ggplot2)
+library(dplyr)
+```
+
+# I. Data Preparation
+
+## 1. Data Loading and Initial Inspection
+
+Load the raw flood control project dataset and understand its structure.
+
+```{r}
+# Load flood control project (fcp) dataset
+fcp_data <- read.csv("flood-control-projects-table_2025-11-21.csv")
+head(fcp_data)
+```
+
+```{r}
+# Quick peek 
+glimpse(fcp_data)
+```
+
+*Observation: There are 36 columns and 9,855 records; most of the variable types are correct.*
+
+```{r}
+# Check for missing values
+colSums(is.na(fcp_data))
+```
+
+*Observation: Only 2 variables, `Program` and `CompletionDateOriginal` have missing values. `Program` has no records at all, while `CompletionDateOriginal` only has 4. This is unlikely to cause any issues, as these columns will not be included in the filtered dataset used for the exploration.*
+
+### 1.1 Data Dictionary – Original Flood Control Project Dataset
+
+This data dictionary describes each variable in the dataset, including its data type, definition, format, and any relevant notes.
+
+1.  **Identification and Administrative Fields**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **GlobalID** | Character | System-generated unique identifier for each record. | Always unique. |
+| **ProjectID** | Character | Identifier assigned to the main flood control project. | Shared across components. |
+| **ProjectComponentID** | Character | Identifier for the specific component or subproject. | One project may have multiple components. |
+| **ProjectDescription** | Character | Narrative description of the flood control project. | Text field. |
+| **ProjectComponentDescription** | Character | Detailed description of the specific project component. | Text field. |
+| **Program** | Logical | Indicates program classification. | Mostly NA. |
+
+2.  **Geographic Information**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **Region** | Character | Administrative region of project location. | e.g., “Region IV-B”. |
+| **Province** | Character | Province where the project is located. | e.g., “Palawan”. |
+| **Municipality** | Character | Municipality/City of implementation. | Full names provided. |
+| **LegislativeDistrict** | Character | Congressional district of the project area. | Text format. |
+| **Longitude** | Double | Longitude coordinate of project site. | WGS84. |
+| **Latitude** | Double | Latitude coordinate of project site. | WGS84. |
+| **X_geo** | Character | Geospatial object stored by GIS system. | Serialized GIS object. |
+
+3.  **Project Classification**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **TypeofWork** | Character | Type of construction work performed. | e.g., “Construction of Flood Mitigation Structure”. |
+| **infra_type** | Character | Infrastructure classification. | e.g., “Flood Control Structures”. |
+| **type** | Character | General category label. | e.g., “flood_control”. |
+| **slug** | Character | URL-friendly identifier for project description. | Lowercase hyphenated. |
+
+4.  **Implementation Offices**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **ImplementingOffice** | Character | DPWH office responsible for project implementation. | District/Regional. |
+| **DistrictEngineeringOffice** | Character | Specific DPWH District Engineering Office. | Matches implementing office. |
+
+5.  **Financial Information**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **ABC** | Double | Approved Budget for the Contract (in PHP). | Numeric version. |
+| **ContractCost** | Double | Actual contract cost (in PHP). | Numeric version. |
+| **ABC_String** | Character | ABC stored as text. | Often no commas/formatting. |
+| **ContractCost_String** | Character | Contract cost stored as text. | With decimals. |
+
+6.  **Project Timeline**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **InfraYear** | Integer | Infrastructure year of the project. | Often same as funding year. |
+| **FundingYear** | Integer | Year when project was funded. | Typically 2023–2024. |
+| **CompletionYear** | Integer | Year indicated for project completion. | Derived from planned completion date. |
+| **StartDate** | Character | Actual start date (MM/DD/YYYY). | Text format. |
+| **CompletionDateOriginal** | Double | Original planned completion date stored as UNIX timestamp. | Requires conversion. |
+| **CompletionDateActual** | Character | Actual completion date (YYYY-MM-DD). | ISO string. |
+
+7.  **Contractor and Administrative Metadata**
+
+| Variable Name | Data Type | Description | Notes |
+|----|----|----|----|
+| **ContractID** | Character | Contract number associated with the project. | Unique per contract. |
+| **Contractor** | Character | Name of contractor executing the project. | Text field. |
+| **ObjectId** | Integer | System object identifier for internal record tracking. | Not unique dataset-wide. |
+| **CreationDate** | Double | Timestamp of record creation. | UNIX timestamp. |
+| **Creator** | Character | System account that created the record. | Usually “dpwh_view”. |
+| **EditDate** | Double | Timestamp of most recent edit. | UNIX timestamp. |
+| **Editor** | Character | System account that edited the record. | Usually “dpwh_view”. |
+
+## 2. Select Relevant Columns
+
+Retain only the columns needed for analysis and geospatial tasks.
+
+```{r}
+fcp_geo <- fcp_geo %>%
+  select(
+    # Identification
+    ProjectID, ProjectDescription,
+
+    # Project Classification
+    TypeofWork, infra_type,
+
+    # Geographic Information
+    Region, Province, Municipality, LegislativeDistrict,
+    Longitude, Latitude,
+
+    # Financial Information
+    ABC, ContractCost,
+
+    # Project Timeline
+    FundingYear, CompletionYear
+  )
+```
+
+*Observation: Features reduced from 36 → 14, which makes the dataset is more focused.*
+
+### **2.1 Column Relevance**
+
+#### **A. Identification**
+
+-   **ProjectID:** Unique identifier for each project (for tracking and joining data).
+
+-   **ProjectDescription:** Brief description of the project (for context in visualizations).
+
+#### **B. Project Classification**
+
+-   **TypeofWork:** Type of construction (e.g., "Construction of Flood Mitigation Structure")—helps categorize projects.
+
+-   **infra_type:** Infrastructure classification (e.g., "Flood Control Structures")—useful for filtering and analysis.
+
+#### **C. Geographic Information**
+
+-   **Region, Province, Municipality, LegislativeDistrict:** Administrative boundaries for spatial aggregation and analysis.
+
+-   **Longitude, Latitude:** Coordinates for mapping and spatial analysis.
+
+#### **D. Financial Information**
+
+-   **ABC (Approved Budget for the Contract):** Budget allocated for each project (for budget analysis by region).
+
+-   **ContractCost:** Actual cost of the project (for cost vs. budget comparisons).
+
+**E. Project Timeline**
+
+-   **FundingYear:** Year the project was funded (for temporal filtering and trend analysis).
+
+-   **CompletionYear:** Year the project was completed (for tracking project timelines).
+
+### **2.2 Verify Quality of Filtered Data**
+
+```{r}
+glimpse(fcp_geo)
+```
+
+*Observation: After selecting only the relevant fields, the number of features was reduced from 36 to 14, resulting in a more focused dataset without unnecessary variables. All retained columns have appropriate data types, with numeric coordinates, properly encoded financial and temporal values, and categorical fields stored as character strings.*
+
+## **3. Filter for 2019–Latest by `FundingYear`**
+
+Year range of the data is filtered by `FundingYear` in order to show **where and when projects were initiated**, reflecting policy priorities and resource allocation. We filter this date for consistency with the other dataset explored in this study.
+
+```{r}
+fcp_geo <- fcp_geo %>%
+  filter(FundingYear >= 2019)
+```
+
+### **3.1 Verify**
+
+```{r}
+range(fcp_geo$FundingYear, na.rm = TRUE)
+```
+
+### **3.2 Check the Number of Projects After Filtering**
+
+```{r}
+nrow(fcp_geo) #filtered dataset
+nrow(fcp_data) #original dataset
+```
+
+*Observation: After filtering the original `fcp_data` by `FundingYear` which only include 2019-2025. From the original **9855** number of observations it went down to **9848**, meaning only **7 records** had a `FundingYear` outside 2019–2025.*
+
+## **4. Save Cleaned Data**
+
+Export the filtered and cleaned dataset for further analysis.
+
+```{r}
+write.csv(fcp_geo, "fcp_geo_2019_2025.csv", row.names = FALSE)
+```
+
+### 4.1 Metadata of `fcp_geo`
+
+| **Column Name** | **Type** | **Description** |
+|----|----|----|
+| **ProjectID** | Character | Unique identifier for each project. |
+| **ProjectDescription** | Character | Short description of the project’s scope or activity. |
+| **TypeofWork** | Character | Type of construction work executed (e.g., flood mitigation). |
+| **infra_type** | Character | General infrastructure classification (e.g., Flood Control Structures). |
+| **Region** | Character | Administrative region of the project location. |
+| **Province** | Character | Province where the project is implemented. |
+| **Municipality** | Character | Municipality or city where the project is located. |
+| **LegislativeDistrict** | Character | Legislative district of the project area. |
+| **Longitude** | Double | Longitude coordinate of the project site (for spatial mapping). |
+| **Latitude** | Double | Latitude coordinate of the project site (for spatial mapping). |
+| **ABC** | Double | Approved Budget for the Contract (project allocation). |
+| **ContractCost** | Double | Actual awarded contract cost. |
+| **FundingYear** | Integer | Year the project received funding. |
+| **CompletionYear** | Integer | Year the project was completed. |
+
+# Summary of Data Preparation
+
+-   Dataset reduced from 36 → 14 columns and filtered for FundingYear ≥ 2019.
+-   Retained columns are relevant, clean, and correctly typed.
+-   Minimal data loss occurred (only 7 rows removed).
+-   The resulting dataset is ready for geospatial EDA and further analysis.
